@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=utf-8">
+<meta name="viewport" id="viewport“ content=" width=device-width,
+	height=device-height, initial-scale=1.0, maximum-scale=1.0,
+	user-scalable=no; " />
+
+<link rel="stylesheet" href="css/jquery.mobile-1.3.0.min.css" />
+<script src="js/jquery-1.9.1.min.js"></script>
+<script src="js/jquery.mobile-1.3.0.min.js"></script>
+
+<script type="text/javascript" charset="utf-8" src="cordova-2.4.0.js"></script>
+<script type="text/javascript" charset="utf-8">
+	var pg = false;
+	var contactList; //listado de contactos recuperados
+	var url;
+	var lat = 39.48;
+	var lon = -0.3470;
+
+	function onBodyLoad() {
+		document.addEventListener("deviceready", onDeviceReady, false);
+	};
+
+	function onDeviceReady() {
+		pg = true;
+		db = window.openDatabase("bdapi10", "1.0", "bdapi10", 1000000);
+		db.transaction(inicializarTablaDB, errorDB, successDB);
+		navigator.geolocation.getCurrentPosition(lecturaGPS, errorGPS, {
+			enableHighAccuracy : true
+		});//Posicionamiento
+	};
+
+	/****************************************************************************/
+
+	function inicializarTablaDB(tx) {
+		tx.executeSql('DROP TABLE IF EXISTS post');
+		tx
+				.executeSql('CREATE TABLE IF NOT EXISTS post (id unique, titulo, cuerpo, imagen, lat, lon)');
+		tx
+				.executeSql(
+						'INSERT INTO post(id, titulo, cuerpo, imagen, lat, lon) VALUES (2, '
+								+ '"PhoneGap"'
+								+ ',"PhoneGap is a free and open source framework that allows you to create mobile apps using standardized web APIs for the platforms you care about."'
+								+ ',"./img/logo.png",39.48,-0.3470)', [],
+						onSqlSuccess, onSqlError);
+
+	};
+
+	function errorDB(tx, err) {
+		alert("error db");
+	};
+
+	function successDB() {
+		console.log("SQL: success");
+	};
+
+	function onSqlSuccess(tx, res) {
+		db.transaction(mostrardatos, errorDB, successDB);
+		console.log("SQL: success");
+		if (res) {
+			console.log(res);
+		}
+	}
+
+	function onSqlError(tx, err) {
+		console.log("Entering onSqlError");
+		var msgText;
+		if (err) {
+			msgText = "SQL: " + err.message + " (" + err.code + ")";
+		} else {
+			msgText = "SQL: Unknown error";
+		}
+		console.error(msgText);
+		alert(msgText);
+		console.log("Leaving onSqlError");
+	}
+
+	function mostrardatos(tx) {
+		tx.executeSql('SELECT * FROM post', [], onQuerySuccess, onQueryFailure);
+	}
+
+	function onQuerySuccess(tx, results) {
+		console.log("ini successQueryDB");
+		var lista = "";
+		var len = results.rows.length;
+		if (len > 0) {
+			lista = '<ul data-role="listview">';
+
+			for ( var i = 0; i < len; i++) {
+
+				lista += '<li>';
+				lista += '<div id="imagen"><img alt="" src="'
+						+ results.rows.item(i).imagen + '"  width="50%"></div>';
+				lista += '<div id="position" style="font-size:80%; float:right; color: gray; padding-bottom:15px;">'
+						+ results.rows.item(i).lat
+						+ ':'
+						+ results.rows.item(i).lon + '</div>';
+				lista += '<div id="titulo"><h1>' + results.rows.item(i).titulo
+						+ '</h1></div>';
+				lista += '<div id="texto" style="font-size:80%;">'
+						+ results.rows.item(i).cuerpo + '</div>';
+
+				lista += '</li>';
+
+			}
+			lista += '</ul>';
+		}
+		$("#posts").html(lista);
+		$('#posts').trigger("create"); //recordatorio clase jqyery
+	}
+
+	function onQueryFailure(tx, err) {
+		console.log("Entering onQueryFailure");
+		var msgText;
+		if (err) {
+			msgText = "Query: " + err;
+		} else {
+			msgText = "Query: Unknown error";
+		}
+		console.error(msgText);
+		console.log("Leaving onQueryFailure");
+	};
+
+	function onAddPost() {
+		db.transaction(insertarfila, errorDB, successDB);
+	};
+
+	function insertarfila(tx) {
+		var formCrearTitulo = document.getElementById('formCrearTitulo').value;
+		var formCrearCuerpo = document.getElementById('formCrearCuerpo').value;
+		var formCrearPosicionLat = lat;
+		var formCrearPosicionLon = lon;
+		var formCrearImg = url;
+
+		var nextid = Math.floor((Math.random() * 1000000000000000) + 1);
+
+		tx.executeSql(
+				'INSERT INTO post(id, titulo, cuerpo, imagen, lat, lon) VALUES ('
+						+ nextid + ',"' + formCrearTitulo + '","'
+						+ formCrearCuerpo + '","' + formCrearImg + '",'
+						+ formCrearPosicionLat + ',' + formCrearPosicionLon
+						+ ')', [], onSqlSuccess, onSqlError);
+
+		$.mobile.changePage("#home", "slide", false, true);
+	};
+
+	/****************************************************************************/
+	function takePhoto() {
+		//navigator.camera.getPicture(onCameraSuccess, onCameraError);
+		navigator.camera.getPicture(onCameraSuccess, onCameraError, {
+			quality : 50,
+			destinationType : Camera.DestinationType.FILE_URI
+		});
+	}
+
+	function recuperarPhoto() {
+		//navigator.camera.getPicture(onCameraSuccess, onCameraError);
+		navigator.camera.getPicture(onCameraSuccess, onCameraError, {
+			quality : 50,
+			destinationType : Camera.DestinationType.FILE_URI,
+			sourceType : Camera.PictureSourceType.SAVEDPHOTOALBUM
+		});
+	}
+
+	function onCameraSuccess(imageURL) {
+		url = imageURL;
+
+		console.log("imageURL: " + imageURL);
+
+		//navigator.notification.alert("onCameraSuccess:"+ imageURL);
+		$("#imageContainer").html('<img src="' + imageURL + '" width="50%">');
+
+	}
+
+	function onCameraError(e) {
+		navigator.notification.alert("onCamerError:" + e);
+	}
+
+	/********************************************************************/
+
+	function lecturaGPS(ubicacion) {
+		lat = ubicacion.coords.latitude;
+		lon = ubicacion.coords.longitude;
+	}
+
+	function errorGPS() {
+		console.log(" No puedo encontrarte :(")
+	}
+</script>
+</head>
+<body onload="onBodyLoad()">
+	<div data-role="page" id="home">
+		<div data-role="header">
+			<h1>Mi bitacora</h1>
+			<a href="#formCrear" data-direction="reverse" class="ui-btn-right">Añadir</a>
+		</div>
+		<div data-role="content">
+			<div id="posts"></div>
+		</div>
+		<div data-role="footer" data-position="fixed">
+			<h3>Curso PhoneGap y jQuery Mobile</h3>
+		</div>
+
+
+	</div>
+
+	<section id="formCrear" data-role="page" data-add-back-btn="true">
+		<header data-role="header">
+			<h1>Nuevo post</h1>
+		</header>
+		<div data-role="content">
+			<div data-role="fieldcontain">
+				<label for="formCrearLabelTitulo">Título:</label> <input type="text"
+					id="formCrearTitulo" />
+			</div>
+			<div data-role="fieldcontain">
+				<label for="formCrearLabelCuerpo">Cuerpo:</label>
+				<textarea id="formCrearCuerpo">
+				</textarea>
+			</div>
+			<hr>
+			<input type="button" onClick="takePhoto()" value="Hacer foto">
+			<input type="button" onClick="recuperarPhoto()"
+				value="Recuperar foto">
+
+			<hr>
+			<div id="imageContainer"></div>
+			<hr>
+			<input type="button" onclick="onAddPost();" id="btnExecuteCrear"
+				value="Crear" />
+		</div>
+	</section>
+
+</body>
